@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jogo da Velha Ajustado</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: url('imagem.png/imagem1.png') no-repeat center center fixed;
+            background-size: cover;
+            overflow: hidden;
+            position: relative;
+        }
+        .container {
+            display: flex;
+            flex-direction: row;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            background-color: rgba(255, 255, 255, 0.8);
+            border-radius: 10px;
+            padding: 20px;
+        }
+        .game-container {
+            display: grid;
+            grid-template-columns: repeat(3, 100px);
+            grid-template-rows: repeat(3, 100px);
+            gap: 5px;
+            margin: 20px 0;
+        }
+        .cell {
+            width: 100px;
+            height: 100px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #87CEEB;
+            font-size: 2rem;
+            font-weight: bold;
+            color: white;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .cell:hover {
+            background-color: #4682B4;
+        }
+        .cell.taken {
+            cursor: not-allowed;
+        }
+        .winner {
+            position: fixed;
+            top: 10%;
+            left: 50%;
+            transform: translate(-50%, 0);
+            font-size: 3rem;
+            color: white;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 20px 40px;
+            border-radius: 15px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            text-align: center;
+            display: none;
+        }
+        .player-column {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .player-icon {
+            font-size: 2rem;
+            font-weight: bold;
+            color: black;
+        }
+        .player-button {
+            width: 150px;
+            height: 50px;
+            background-color: yellow;
+            color: black;
+            font-size: 1.5rem;
+            font-weight: bold;
+            border: 2px solid black;
+            border-radius: 15px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: box-shadow 0.3s;
+        }
+        .player-button:hover {
+            background-color: #f0e68c;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.6);
+        }
+        .start-button {
+            width: 200px;
+            height: 60px;
+            background-color: red;
+            color: white;
+            font-size: 1.5rem;
+            font-weight: bold;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 20px;
+            display: block;
+            text-align: center;
+        }
+        .start-button:hover {
+            background-color: #b30000;
+        }
+        .mute-button {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background-color: #4682B4;
+            color: white;
+            font-size: 1rem;
+            font-weight: bold;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .mute-button:hover {
+            background-color: #315f7c;
+        }
+    </style>
+</head>
+<body>
+    <button class="mute-button" id="muteButton">🔊 Som Ligado</button>
+    <div class="container">
+        <div class="player-column">
+            <div class="player-icon">X</div>
+            <button class="player-button" id="player1Name">Jogador 1</button>
+        </div>
+        <div class="game-container" id="gameBoard"></div>
+        <div class="player-column">
+            <div class="player-icon">O</div>
+            <button class="player-button" id="player2Name">Jogador 2</button>
+        </div>
+    </div>
+    <button class="start-button" id="startButton">Jogar</button>
+    <div class="winner" id="winnerMessage"></div>
+
+    <audio id="backgroundMusic" loop>
+        <source src="music.mp3/game-music1.mp3" type="audio/mp3">
+    </audio>
+
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <script>
+        const board = document.getElementById('gameBoard');
+        const winnerMessage = document.getElementById('winnerMessage');
+        const player1NameDiv = document.getElementById('player1Name');
+        const player2NameDiv = document.getElementById('player2Name');
+        const backgroundMusic = document.getElementById('backgroundMusic');
+        const startButton = document.getElementById('startButton');
+        const muteButton = document.getElementById('muteButton');
+
+        let currentPlayer = 'X';
+        let player1Name = 'Jogador 1';
+        let player2Name = 'Jogador 2';
+        let gameState = Array(9).fill(null);
+        let isMuted = false;
+        let confettiInterval;
+
+        // Reproduzir música fixa
+        backgroundMusic.addEventListener('ended', () => {
+            backgroundMusic.play().catch(error => console.error("Erro ao reproduzir música:", error));
+        });
+
+        muteButton.addEventListener('click', () => {
+            isMuted = !isMuted;
+            if (isMuted) {
+                backgroundMusic.pause();
+                muteButton.textContent = '🔇 Som Desligado';
+            } else {
+                backgroundMusic.play().catch(error => console.error("Erro ao reproduzir música:", error));
+                muteButton.textContent = '🔊 Som Ligado';
+            }
+        });
+
+        startButton.addEventListener('click', () => {
+            clearInterval(confettiInterval); // Parar os confetes ao iniciar um novo jogo
+            startGame();
+        });
+
+        function checkWinner() {
+            const winningCombinations = [
+                [0, 1, 2],
+                [3, 4, 5],
+                [6, 7, 8],
+                [0, 3, 6],
+                [1, 4, 7],
+                [2, 5, 8],
+                [0, 4, 8],
+                [2, 4, 6]
+            ];
+
+            for (const combo of winningCombinations) {
+                const [a, b, c] = combo;
+                if (gameState[a] && gameState[a] === gameState[b] && gameState[a] === gameState[c]) {
+                    return gameState[a];
+                }
+            }
+
+            return gameState.includes(null) ? null : 'Empate';
+        }
+
+        function triggerConfetti() {
+            confettiInterval = setInterval(() => {
+                confetti({
+                    particleCount: 100,
+                    spread: 70,
+                    origin: { x: 0.5, y: Math.random() / 2 },
+                    colors: ['#ff0', '#ff6347', '#87CEEB', '#32CD32']
+                });
+            }, 500);
+        }
+
+        function showWinnerSplash(winnerName) {
+            winnerMessage.textContent = `🎉 Parabéns, ${winnerName}! 🎉`;
+            winnerMessage.style.display = 'block';
+            triggerConfetti();
+        }
+
+        function handleCellClick(event, index) {
+            if (gameState[index] || winnerMessage.style.display === 'block') return;
+
+            gameState[index] = currentPlayer;
+            event.target.textContent = currentPlayer;
+            event.target.classList.add('taken');
+
+            const winner = checkWinner();
+
+            if (winner) {
+                if (winner === 'Empate') {
+                    winnerMessage.textContent = 'Empate!';
+                    winnerMessage.style.display = 'block';
+                } else {
+                    const winnerName = winner === 'X' ? player1Name : player2Name;
+                    showWinnerSplash(winnerName);
+                }
+            } else {
+                currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+            }
+        }
+
+        function createBoard() {
+            board.innerHTML = '';
+            gameState = Array(9).fill(null);
+            winnerMessage.textContent = '';
+            winnerMessage.style.display = 'none';
+
+            for (let i = 0; i < 9; i++) {
+                const cell = document.createElement('div');
+                cell.classList.add('cell');
+                cell.addEventListener('click', (event) => handleCellClick(event, i));
+                board.appendChild(cell);
+            }
+        }
+
+        function startGame() {
+            player1Name = prompt('Digite o nome do Jogador 1 (X):', 'Jogador 1') || 'Jogador 1';
+            player2Name = prompt('Digite o nome do Jogador 2 (O):', 'Jogador 2') || 'Jogador 2';
+
+            player1NameDiv.textContent = player1Name;
+            player2NameDiv.textContent = player2Name;
+
+            createBoard();
+            if (!isMuted) backgroundMusic.play().catch(error => console.error("Erro ao reproduzir música:", error));
+        }
+
+        createBoard();
+        if (!isMuted) backgroundMusic.play().catch(error => console.error("Erro ao reproduzir música:", error));
+    </script>
+</body>
+</html>
